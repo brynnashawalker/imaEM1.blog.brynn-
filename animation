@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<style>
+@keyframes redToYellow {
+  from {background-color: red;}
+  to {background-color: yellow;}
+}
+
+/* standard syntax */
+body {
+  width: 100%;
+  height: 100%;
+background-color: red;
+animation-name: redToYellow;
+    animation-duration: 4s;
+    /*
+    animation-direction values are
+    normal - play forward and resets to start over
+    reverse - plays backwards and resets to end state
+    alternate - reverses direction each cycle, first is forward
+    alternate-reverse - reverses direction each cycle, first is backwards
+    */
+    animation-direction: alternate-reverse;
+    animation-iteration-count: infinite;
+}
+</style>
