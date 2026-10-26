@@ -9,6 +9,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>incantation two</title>
     <script src="https://cloudflare.com"></script>
+
+        <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f6f8fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+        .audio-btn {
+            background-color: #2da44e;
+            color: white;
+            border: 1px solid rgba(27, 31, 36, 0.15);
+            border-radius: 6px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .audio-btn:hover {
+            background-color: #2c974b;
+        }
+        .audio-btn.playing {
+            background-color: #cf222e;
+        }
+        .audio-btn.playing:hover {
+            background-color: #b60214;
+        }
+    </style>
 <!--
 <style>
 @keyframes hotpinkToPurple {
@@ -40,11 +71,44 @@ animation-name: hotpinkToPurple;
   <script src="emitter.js"></script>
   <script src="particle.js"></script>
   <script src="sketch.js"></script>
-   
-    <audio controls>
+
+    <!-- The Trigger Button -->
+    <button id="soundButton" class="audio-btn">Play Repeating Sound</button>
+
+    <!-- The Hidden Audio Element -->
+    <audio id="myAudio" src="sound/speaker.fun.brynn~.mp3" preload="auto"></audio>
+
+    <script>
+        const button = document.getElementById('soundButton');
+        const audio = document.getElementById('myAudio');
+
+        // Force the audio to loop indefinitely
+        audio.loop = true;
+
+        button.addEventListener('click', () => {
+            if (audio.paused) {
+                // Play audio and update button text/style
+                audio.play()
+                    .then(() => {
+                        button.textContent = "Stop Sound";
+                        button.classList.add('playing');
+                    })
+                    .catch(error => {
+                        console.error("Playback failed:", error);
+                    });
+            } else {
+                // Pause audio, reset timeline to start, and reset button
+                audio.pause();
+                audio.currentTime = 0; 
+                button.textContent = "Play Repeating Sound";
+                button.classList.remove('playing');
+            }
+        });
+    </script>   
+<!--    <audio controls>
      <source src="sound/speaker.fun.brynn~.mp3" type="audio/mpeg">
      Your browser does not support the audio element.
     </audio>
- 
+ -->
  </body>
 </html>
