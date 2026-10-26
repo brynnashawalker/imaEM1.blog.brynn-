@@ -6,7 +6,7 @@ function setup() {
 }
 
 function draw() {
-  background(51, 8, 71);
+  /* background(51, 8, 71); */
   emitter.updatePosition(mouseX, mouseY);
   emitter.emit(100);
   emitter.show();
