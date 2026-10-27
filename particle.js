@@ -36,7 +36,7 @@ class Particle {
     this.pos.add(this.vel);
     this.acc.set(0, 0);
 
-    this.lifetime -= 5;
+    this.lifetime -= 10;
   }
 
   show() {
