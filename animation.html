@@ -11,9 +11,18 @@
     <script src="https://cloudflare.com"></script>
 
     <style>
-        .center-text {
-            text-align: center;
-        }
+        .audio-container {
+      display: flex;         /* Activates flexbox layout */
+      align-items: center;   /* Vertically centers the text and audio player */
+      gap: 15px;             /* Adds clean spacing between text and the player */
+    }
+
+    /* Optional styling for the text label */
+    .audio-label {
+      font-family: sans-serif;
+      font-weight: bold;
+      color: #333;
+    }
     </style>
     
   <!--
@@ -48,6 +57,7 @@ animation-name: hotpinkToPurple;
   <script src="particle.js"></script>
   <script src="sketch.js"></script>  
    <div class="audio-container" style="display: flex; justify-content: center;">
+     <span class="audio-label">this is pleasure activism</span>
   <audio controls>
     <source src="sound/speaker.fun.brynn~.mp3" type="audio/mpeg">
     Your browser does not support the audio element.
@@ -62,9 +72,9 @@ animation-name: hotpinkToPurple;
   }
 </style>
 
-<p class="center-text">this is pleasure activism</p>
+<!-- <p class="center-text">this is pleasure activism</p>
 
-<!--   <div class="audio-container"
+   <div class="audio-container"
        <audio controls>
      <source src="sound/speaker.fun.brynn~.mp3" type="audio/mpeg">
      Your browser does not support the audio element.
