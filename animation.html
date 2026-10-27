@@ -23,9 +23,12 @@
       font-weight: bold;
       color: #E6E6FA;
     }
-        html {
+        html, body {
+           margin: 0;
+           padding: 0;
+           height: 100%;
             /* Converts the purple heart SVG into a data URI for the cursor */
-            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='32' height='32' style='font-size:24px'><text y='24'>💜</text></svg>"), auto;
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://w3.org' width='32' height='32' style='font-size:24px'%3E%3Ctext y='24'%3E💜%3C/text%3E%3C/svg%3E") 16 16, auto;
         }
     </style>
     
