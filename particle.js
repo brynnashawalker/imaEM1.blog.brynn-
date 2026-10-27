@@ -5,7 +5,7 @@ class Particle {
     this.vel.mult(random(0.5, 2));
     this.acc = createVector(0, 0);
     this.r = 4;
-    this.lifetime = 255;
+    this.lifetime = 255, 105, 180;
   }
 
   finished() {
@@ -40,9 +40,9 @@ class Particle {
   }
 
   show() {
-    stroke(255, this.lifetime);
+    stroke(255, 105, 180, this.lifetime);
     strokeWeight(2);
-    fill(255, this.lifetime);
+    fill(255, 105, 180, this.lifetime);
 
     ellipse(this.pos.x, this.pos.y, this.r * 2);
   }
