@@ -2,7 +2,7 @@ let emitter;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  emitter = new Emitter(width / 1, height / 1);
+  emitter = new Emitter(width / 2, height / 2);
 }
 
 function draw() {
