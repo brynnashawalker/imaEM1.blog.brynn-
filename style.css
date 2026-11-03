@@ -23,6 +23,9 @@ animation-name: hotpinkToPurple;
 }
 
 .audio-container {
+  display: flex;         /* Activates flexbox layout */
+      align-items: center;   /* Vertically centers the text and audio player */
+      gap: 15px;             /* Adds clean spacing between text and the player */
     background-color: #C11C84; /* Your desired background color */
     padding: 10px;             /* Adds spacing around the player */
     display: inline-block;     /* Keeps the container tight around the player */
