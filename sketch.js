@@ -9,7 +9,7 @@ function setup() {
   emitter = new Emitter(width / 2, height / 2);
 
   purple = color(51, 8, 71);
-  lily = color(205, 255, 240);
+  lily = color(250, 225, 255);
 }
 
 function draw() {
