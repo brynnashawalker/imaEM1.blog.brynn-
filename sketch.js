@@ -8,12 +8,12 @@ function setup() {
   emitter = new Emitter(width / 2, height / 2);
 
   purple = color(51, 8, 71);
-  pink = color(255, 105, 180);
+  pink = color(237, 7, 122);
 }
 
 function draw() {
   // Calculate a repeating 2-second cycle
-  let t = (millis() % 2000) / 1000;
+  let t = (millis() % 2000) / 3000;
 
   // Smoothly fade between the two colors
   let amt;
