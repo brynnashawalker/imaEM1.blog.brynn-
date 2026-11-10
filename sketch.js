@@ -9,7 +9,7 @@ function setup() {
   emitter = new Emitter(width / 2, height / 2);
 
   purple = color(51, 8, 71);
-  pink = color(237, 7, 122);
+  lily = color(205, 255, 240);
 }
 
 function draw() {
@@ -21,7 +21,7 @@ function draw() {
   let amt = (x + y) / 2;
 
   // Reverse the value so top-left is pink
-  let bgColor = lerpColor(pink, purple, amt);
+  let bgColor = lerpColor(lily, purple, amt);
 
   background(bgColor);
 
