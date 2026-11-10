@@ -1,3 +1,4 @@
+
 let emitter;
 
 let purple;
@@ -12,26 +13,21 @@ function setup() {
 }
 
 function draw() {
-  // Calculate a repeating 2-second cycle
+  // Repeat a 2-second animation cycle
   let t = (millis() % 2000) / 3000;
 
-  // Smoothly fade between the two colors
-  let amt;
+  // Smooth fade in and fade out
+  let amt = (1 - cos(TWO_PI * t)) / 2;
 
-  if (t < 1) {
-    amt = t;
-    background(lerpColor(purple, pink, amt));
-  } else {
-    amt = t - 1;
-    background(lerpColor(pink, purple, amt));
-  }
+  let bgColor = lerpColor(purple, pink, amt);
+
+  background(bgColor);
 
   emitter.updatePosition(mouseX, mouseY);
   emitter.emit(50);
   emitter.show();
   emitter.update();
 }
-
 
 /*let emitter;
 
