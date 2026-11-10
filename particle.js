@@ -1,4 +1,3 @@
-
 class Particle {
   constructor(x, y) {
     this.pos = createVector(x, y);
@@ -11,49 +10,63 @@ class Particle {
   }
 
   finished() {
-    return this.lifetime < 0;
+    return false; // Keep particles visible
   }
 
   applyForce(force) {
     this.acc.add(force);
   }
 
-  edges() {
-    // Bottom collision
-    if (this.pos.y >= height - this.r) {
-      this.pos.y = height - this.r;
-      this.vel.y = 0;
-      this.vel.x *= 0.9;
-      this.settled = true;
-    }
-
-    // Side collisions
-    if (this.pos.x >= width - this.r) {
-      this.pos.x = width - this.r;
-      this.vel.x *= -0.5;
-    } else if (this.pos.x <= this.r) {
-      this.pos.x = this.r;
-      this.vel.x *= -0.5;
-    }
-  }
-
-  update() {
+  update(particles) {
     if (!this.settled) {
-      // Gravity
+      // Apply gravity
       this.applyForce(createVector(0, 0.15));
 
       this.vel.add(this.acc);
       this.pos.add(this.vel);
 
-      // Air resistance
-      this.vel.mult(0.99);
-    }
+      this.acc.set(0, 0);
 
-    this.acc.set(0, 0);
+      // Floor collision
+      if (this.pos.y >= height - this.r) {
+        this.pos.y = height - this.r;
+        this.settled = true;
+        this.vel.set(0, 0);
+      }
 
-    // Keep settled particles visible
-    if (!this.settled) {
-      this.lifetime -= 1;
+      // Collision with other particles
+      for (let other of particles) {
+        if (other === this) continue;
+
+        let d = dist(
+          this.pos.x,
+          this.pos.y,
+          other.pos.x,
+          other.pos.y
+        );
+
+        let minDist = this.r + other.r;
+
+        if (d < minDist && other.settled) {
+          let angle = atan2(
+            this.pos.y - other.pos.y,
+            this.pos.x - other.pos.x
+          );
+
+          this.pos.x = other.pos.x + cos(angle) * minDist;
+          this.pos.y = other.pos.y + sin(angle) * minDist;
+
+          this.settled = true;
+          this.vel.set(0, 0);
+        }
+      }
+
+      // Keep particles inside the canvas
+      this.pos.x = constrain(
+        this.pos.x,
+        this.r,
+        width - this.r
+      );
     }
   }
 
@@ -65,6 +78,7 @@ class Particle {
     ellipse(this.pos.x, this.pos.y, this.r * 2);
   }
 }
+
 /*
 class Particle {
   constructor(x, y) {
