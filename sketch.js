@@ -14,7 +14,7 @@ function setup() {
 
 function draw() {
   // Repeat a 2-second animation cycle
-  let t = (millis() % 2000) / 3000;
+  let t = (millis() % 3000) / 3000;
 
   // Smooth fade in and fade out
   let amt = (1 - cos(TWO_PI * t)) / 2;
