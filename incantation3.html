@@ -1,0 +1,781 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Motion / Sound</title>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #f58cba;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: block;
+}
+
+#interface {
+    position: fixed;
+    top: 30px;
+    left: 35px;
+    z-index: 5;
+    color: white;
+    pointer-events: none;
+    mix-blend-mode: difference;
+}
+
+#interface h1 {
+    font-size: 23px;
+    letter-spacing: 4px;
+    font-weight: 400;
+}
+
+#interface p {
+    margin-top: 9px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+}
+
+#status {
+    margin-top: 14px;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+
+#startScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    background: rgba(30, 10, 40, 0.4);
+    backdrop-filter: blur(12px);
+    color: white;
+    text-align: center;
+}
+
+#startScreen h2 {
+    font-size: clamp(24px, 5vw, 42px);
+    font-weight: 300;
+    letter-spacing: 5px;
+}
+
+#startScreen p {
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    padding: 0 20px;
+}
+
+#startButton {
+    margin-top: 10px;
+    padding: 15px 35px;
+    border: 1px solid white;
+    border-radius: 40px;
+    color: white;
+    background: transparent;
+    cursor: pointer;
+    letter-spacing: 2px;
+    font-size: 11px;
+    transition: 0.3s;
+}
+
+#startButton:hover {
+    color: #a64bba;
+    background: white;
+}
+
+#startButton:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+#cameraPreview {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 120px;
+    height: 90px;
+    object-fit: cover;
+    transform: scaleX(-1);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 8px;
+    opacity: 0.35;
+    z-index: 4;
+    display: none;
+}
+
+#soundInfo {
+    position: fixed;
+    bottom: 25px;
+    left: 35px;
+    color: white;
+    z-index: 4;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 2;
+    pointer-events: none;
+    mix-blend-mode: difference;
+}
+
+@media (max-width: 600px) {
+    #interface {
+        top: 20px;
+        left: 20px;
+    }
+
+    #soundInfo {
+        left: 20px;
+        bottom: 20px;
+    }
+
+    #cameraPreview {
+        width: 90px;
+        height: 68px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<!-- Interface -->
+<div id="interface">
+    <h1>MOTION / SOUND</h1>
+    <p>Move your index finger to interact</p>
+    <div id="status">INITIALIZING...</div>
+</div>
+
+<!-- Audio information -->
+<div id="soundInfo">
+    SINE / SQUARE / TRIANGLE / SAWTOOTH<br>
+    FREQUENCY: 440 HZ<br>
+    DISTORTION: CENTER → EDGES
+</div>
+
+<!-- Start screen -->
+<div id="startScreen">
+    <h2>ENTER THE EXPERIENCE</h2>
+    <p>Allow camera access and move your index finger to create.</p>
+    <button id="startButton">START EXPERIENCE</button>
+</div>
+
+<script>
+
+// ==========================================
+// GLOBAL VARIABLES
+// ==========================================
+
+// Hand tracking
+let handPose;
+let video;
+let hands = [];
+
+let modelReady = false;
+let videoReady = false;
+let detectionStarted = false;
+
+// Pointer
+let pointerX = 0;
+let pointerY = 0;
+
+let previousX = 0;
+let previousY = 0;
+
+let smoothX = 0;
+let smoothY = 0;
+
+// Movement
+let speed = 0;
+
+// Particles
+let particles = [];
+
+// Background
+let pink;
+let purple;
+
+// Audio
+let oscillators = [];
+let oscillatorGains = [];
+
+let distortion;
+let limiter;
+
+let audioReady = false;
+let audioStarted = false;
+
+let currentDistortion = 0.05;
+
+// ==========================================
+// SETUP
+// ==========================================
+
+function setup() {
+
+    createCanvas(windowWidth, windowHeight);
+
+    pixelDensity(1);
+
+    pink = color(255, 105, 180);
+    purple = color(115, 45, 190);
+
+    smoothX = width / 2;
+    smoothY = height / 2;
+
+    pointerX = smoothX;
+    pointerY = smoothY;
+
+    previousX = pointerX;
+    previousY = pointerY;
+
+    // Initialize webcam
+    video = createCapture(VIDEO, () => {
+
+        videoReady = true;
+
+        console.log("Camera ready");
+
+        tryStartTracking();
+
+    });
+
+    video.size(640, 480);
+    video.hide();
+
+    video.elt.id = "cameraPreview";
+
+    // Initialize audio
+    initializeAudio();
+
+    // Initialize ml5
+    handPose = ml5.handPose({
+        flipped: true
+    }, () => {
+
+        modelReady = true;
+
+        console.log("Hand tracking model loaded");
+
+        tryStartTracking();
+
+    });
+
+}
+
+// ==========================================
+// AUDIO INITIALIZATION
+// ==========================================
+
+function initializeAudio() {
+
+    // Shared distortion effect
+    distortion = new Tone.Distortion({
+        distortion: 0.05,
+        oversample: "4x"
+    });
+
+    // Limit output to approximately 0.1 linear amplitude
+    // (-20 dBFS)
+    limiter = new Tone.Limiter(-20);
+
+    distortion.connect(limiter);
+    limiter.toDestination();
+
+    // Four oscillator types
+    const waveforms = [
+        "sine",
+        "square",
+        "triangle",
+        "sawtooth"
+    ];
+
+    waveforms.forEach((waveform) => {
+
+        let oscillator = new Tone.Oscillator({
+            frequency: 440,
+            type: waveform
+        });
+
+        // Each oscillator contributes 0.025 amplitude.
+        // Four oscillators have a combined maximum of 0.1
+        // before distortion and limiting.
+        let gain = new Tone.Gain(0.025);
+
+        oscillator.connect(gain);
+        gain.connect(distortion);
+
+        oscillators.push(oscillator);
+        oscillatorGains.push(gain);
+
+    });
+
+    console.log("Four oscillators initialized");
+
+}
+
+// ==========================================
+// START EXPERIENCE
+// ==========================================
+
+document.getElementById("startButton")
+.addEventListener("click", async function() {
+
+    const button = this;
+
+    const status = document.getElementById("status");
+
+    button.disabled = true;
+    button.innerText = "STARTING...";
+
+    status.innerText = "ACTIVATING AUDIO...";
+
+    try {
+
+        // Unlock browser audio
+        await Tone.start();
+
+        // Start all four oscillators
+        if (!audioStarted) {
+
+            oscillators.forEach(oscillator => {
+                oscillator.start();
+            });
+
+            audioStarted = true;
+
+        }
+
+        audioReady = true;
+
+        // Hide start screen
+        document.getElementById("startScreen").style.display = "none";
+
+        // Show webcam
+        document.getElementById("cameraPreview").style.display = "block";
+
+        status.innerText = "EXPERIENCE ACTIVE";
+
+        console.log("Audio successfully started");
+
+    } catch (error) {
+
+        console.error("Audio startup error:", error);
+
+        status.innerText = "AUDIO ERROR - CHECK CONSOLE";
+
+        button.innerText = "TRY AGAIN";
+        button.disabled = false;
+
+    }
+
+});
+
+// ==========================================
+// HAND TRACKING INITIALIZATION
+// ==========================================
+
+function tryStartTracking() {
+
+    if (
+        modelReady &&
+        videoReady &&
+        !detectionStarted
+    ) {
+
+        handPose.detectStart(video, gotHands);
+
+        detectionStarted = true;
+
+        console.log("Hand tracking started");
+
+    }
+
+}
+
+function gotHands(results) {
+
+    hands = results;
+
+}
+
+// ==========================================
+// MAIN DRAW LOOP
+// ==========================================
+
+function draw() {
+
+    // --------------------------------------
+    // TRACK INDEX FINGER
+    // --------------------------------------
+
+    let oldX = pointerX;
+    let oldY = pointerY;
+
+    if (hands.length > 0) {
+
+        let indexTip = hands[0].keypoints[8];
+
+        let targetX = map(
+            indexTip.x,
+            0,
+            video.width,
+            0,
+            width
+        );
+
+        let targetY = map(
+            indexTip.y,
+            0,
+            video.height,
+            0,
+            height
+        );
+
+        targetX = constrain(targetX, 0, width);
+        targetY = constrain(targetY, 0, height);
+
+        // Smooth pointer movement
+        smoothX = lerp(smoothX, targetX, 0.35);
+        smoothY = lerp(smoothY, targetY, 0.35);
+
+        pointerX = smoothX;
+        pointerY = smoothY;
+
+        document.getElementById("status").innerText =
+            "TRACKING ACTIVE";
+
+    } else {
+
+        document.getElementById("status").innerText =
+            modelReady
+            ? "SHOW YOUR INDEX FINGER"
+            : "LOADING HAND TRACKING...";
+
+    }
+
+    // --------------------------------------
+    // CALCULATE MOVEMENT SPEED
+    // --------------------------------------
+
+    let distance = dist(
+        pointerX,
+        pointerY,
+        previousX,
+        previousY
+    );
+
+    speed = lerp(speed, distance, 0.2);
+
+    // --------------------------------------
+    // DYNAMIC BACKGROUND GRADIENT
+    // --------------------------------------
+
+    let gradientAmount = constrain(
+        (pointerX / width + pointerY / height) / 2,
+        0,
+        1
+    );
+
+    let backgroundColor = lerpColor(
+        pink,
+        purple,
+        gradientAmount
+    );
+
+    background(backgroundColor);
+
+    // --------------------------------------
+    // SMOOTH PARTICLE EMISSION
+    // --------------------------------------
+
+    let emission = map(
+        speed,
+        0,
+        35,
+        0,
+        15,
+        true
+    );
+
+    let count = floor(emission);
+
+    if (random() < emission - count) {
+        count++;
+    }
+
+    // Place particles along the finger's path
+    for (let i = 0; i < count; i++) {
+
+        let t = random();
+
+        let particleX = lerp(
+            previousX,
+            pointerX,
+            t
+        );
+
+        let particleY = lerp(
+            previousY,
+            pointerY,
+            t
+        );
+
+        particles.push(
+            new Particle(particleX, particleY, speed)
+        );
+
+    }
+
+    // Prevent excessive particle count
+    if (particles.length > 900) {
+
+        particles.splice(
+            0,
+            particles.length - 900
+        );
+
+    }
+
+    // --------------------------------------
+    // DRAW GLOWING PARTICLES
+    // --------------------------------------
+
+    blendMode(ADD);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+
+        let particle = particles[i];
+
+        particle.update();
+        particle.display();
+
+        if (particle.finished()) {
+
+            particles.splice(i, 1);
+
+        }
+
+    }
+
+    blendMode(BLEND);
+
+    // --------------------------------------
+    // GLOWING POINTER
+    // --------------------------------------
+
+    noStroke();
+
+    fill(255, 180, 230, 20);
+    circle(pointerX, pointerY, 100);
+
+    fill(255, 180, 230, 35);
+    circle(pointerX, pointerY, 65);
+
+    fill(255, 255, 255, 100);
+    circle(pointerX, pointerY, 28);
+
+    fill(255);
+    circle(pointerX, pointerY, 7);
+
+    // --------------------------------------
+    // UPDATE AUDIO DISTORTION
+    // --------------------------------------
+
+    updateDistortion();
+
+    // Save previous position for next frame
+    previousX = pointerX;
+    previousY = pointerY;
+
+}
+
+// ==========================================
+// PARTICLE CLASS
+// ==========================================
+
+class Particle {
+
+    constructor(x, y, movementSpeed) {
+
+        this.x = x;
+        this.y = y;
+
+        let angle = random(TWO_PI);
+
+        let force = random(0.2, 1.5) +
+                    movementSpeed * 0.04;
+
+        this.vx = cos(angle) * force;
+        this.vy = sin(angle) * force;
+
+        this.size = random(4, 12) +
+                    min(movementSpeed * 0.12, 5);
+
+        this.alpha = random(130, 230);
+
+        this.decay = random(1.2, 2.8);
+
+        this.color = random([
+            color(255, 190, 230),
+            color(225, 170, 255),
+            color(255, 255, 255),
+            color(190, 145, 255)
+        ]);
+
+    }
+
+    update() {
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        this.vx *= 0.97;
+        this.vy *= 0.97;
+
+        this.alpha -= this.decay;
+
+        this.size *= 0.993;
+
+    }
+
+    display() {
+
+        noStroke();
+
+        // Outer glow
+        this.color.setAlpha(this.alpha * 0.12);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size * 4
+        );
+
+        // Middle glow
+        this.color.setAlpha(this.alpha * 0.3);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size * 2
+        );
+
+        // Bright center
+        this.color.setAlpha(this.alpha);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size
+        );
+
+    }
+
+    finished() {
+
+        return this.alpha <= 0;
+
+    }
+
+}
+
+// ==========================================
+// SPATIAL DISTORTION SYSTEM
+// ==========================================
+
+function updateDistortion() {
+
+    if (!audioReady) return;
+
+    // Normalize pointer coordinates
+    let x = pointerX / width;
+    let y = pointerY / height;
+
+    // Distance from the center
+    // 0 = center
+    // 1 = outer edge
+    let edgeDistance = max(
+        abs(x - 0.5),
+        abs(y - 0.5)
+    ) * 2;
+
+    edgeDistance = constrain(
+        edgeDistance,
+        0,
+        1
+    );
+
+    // Map distance to distortion
+    let targetDistortion = map(
+        edgeDistance,
+        0,
+        1,
+        0.05,
+        0.95
+    );
+
+    // Smooth distortion movement
+    let smoothing = 1 - Math.exp(-deltaTime / 250);
+
+    currentDistortion = lerp(
+        currentDistortion,
+        targetDistortion,
+        smoothing
+    );
+
+    // Avoid unnecessary parameter updates
+    if (abs(distortion.distortion - currentDistortion) > 0.005) {
+
+        distortion.distortion = currentDistortion;
+
+    }
+
+}
+
+// ==========================================
+// RESPONSIVE CANVAS
+// ==========================================
+
+function windowResized() {
+
+    resizeCanvas(
+        windowWidth,
+        windowHeight
+    );
+
+}
+
+</script>
+
+</body>
+</html>
