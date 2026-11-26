@@ -1,0 +1,651 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motion / Sound Experience</title>
+
+<!-- p5.js and ml5.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #f58cba;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+    z-index: 1;
+}
+
+#interface {
+    position: fixed;
+    top: 30px;
+    left: 35px;
+    z-index: 5;
+    color: white;
+    pointer-events: none;
+    mix-blend-mode: difference;
+}
+
+#interface h1 {
+    font-size: 23px;
+    letter-spacing: 4px;
+    font-weight: 400;
+}
+
+#interface p {
+    margin-top: 9px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+}
+
+#status {
+    margin-top: 14px;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+
+#startScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    background: rgba(30, 10, 40, 0.35);
+    backdrop-filter: blur(12px);
+    color: white;
+    text-align: center;
+}
+
+#startScreen h2 {
+    font-size: clamp(24px, 5vw, 42px);
+    font-weight: 300;
+    letter-spacing: 5px;
+}
+
+#startScreen p {
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    padding: 0 20px;
+}
+
+#startButton {
+    margin-top: 10px;
+    padding: 15px 35px;
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 40px;
+    color: white;
+    background: transparent;
+    cursor: pointer;
+    letter-spacing: 2px;
+    font-size: 11px;
+    transition: 0.3s;
+}
+
+#startButton:hover {
+    color: #a64bba;
+    background: white;
+}
+
+#cameraPreview {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 120px;
+    height: 90px;
+    object-fit: cover;
+    transform: scaleX(-1);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 8px;
+    opacity: 0.35;
+    z-index: 4;
+    display: none;
+}
+
+@media (max-width: 600px) {
+    #interface {
+        top: 20px;
+        left: 20px;
+    }
+
+    #cameraPreview {
+        width: 90px;
+        height: 68px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="interface">
+    <h1>MOTION / SOUND</h1>
+    <p>Move your index finger to interact</p>
+    <div id="status">Waiting to start...</div>
+</div>
+
+<div id="startScreen">
+    <h2>ENTER THE EXPERIENCE</h2>
+    <p>Allow camera access and move your index finger to create.</p>
+    <button id="startButton">START EXPERIENCE</button>
+</div>
+
+<script>
+
+// ======================================
+// GLOBAL VARIABLES
+// ======================================
+
+let handPose;
+let video;
+let hands = [];
+
+let particles = [];
+
+let pointerX = 0;
+let pointerY = 0;
+
+let previousX = 0;
+let previousY = 0;
+
+let smoothX = 0;
+let smoothY = 0;
+
+let speed = 0;
+
+let tracking = false;
+let audioReady = false;
+
+let pink;
+let purple;
+
+// Audio files
+let sounds = [];
+
+// Current smoothed audio volumes
+let currentVolumes = [0, 0, 0, 0];
+
+// Corner positions
+let corners = [
+    [0, 0], // Top left
+    [1, 0], // Top right
+    [0, 1], // Bottom left
+    [1, 1]  // Bottom right
+];
+
+// ======================================
+// INITIALIZATION
+// ======================================
+
+function setup() {
+
+    createCanvas(windowWidth, windowHeight);
+
+    pixelDensity(1);
+
+    pink = color(255, 105, 180);
+    purple = color(115, 45, 190);
+
+    smoothX = width / 2;
+    smoothY = height / 2;
+
+    pointerX = smoothX;
+    pointerY = smoothY;
+
+    // Load webcam
+    video = createCapture(VIDEO);
+
+    video.size(640, 480);
+    video.hide();
+
+    // Initialize audio
+    sounds = [
+        new Audio("audio/top-left.mp3"),
+        new Audio("audio/top-right.mp3"),
+        new Audio("audio/bottom-left.mp3"),
+        new Audio("audio/bottom-right.mp3")
+    ];
+
+    sounds.forEach(sound => {
+        sound.loop = true;
+        sound.volume = 0;
+        sound.preload = "auto";
+    });
+
+    // Load ml5 hand tracking
+    handPose = ml5.handPose({
+        flipped: true
+    }, () => {
+
+        document.getElementById("status").innerText =
+            "Hand tracking ready";
+
+    });
+
+    handPose.detectStart(video, gotHands);
+
+    // Camera preview
+    video.elt.id = "cameraPreview";
+    video.elt.style.display = "none";
+}
+
+// ======================================
+// START EXPERIENCE
+// ======================================
+
+document.getElementById("startButton").addEventListener("click", async () => {
+
+    try {
+
+        // Start audio in response to user gesture
+        await Promise.all(sounds.map(sound => sound.play()));
+
+        audioReady = true;
+
+        document.getElementById("startScreen").style.display = "none";
+
+        document.getElementById("cameraPreview").style.display = "block";
+
+        document.getElementById("status").innerText =
+            "Show your index finger";
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("status").innerText =
+            "Audio could not start. Check your audio files.";
+
+    }
+
+});
+
+// ======================================
+// HAND TRACKING
+// ======================================
+
+function gotHands(results) {
+
+    hands = results;
+
+    tracking = hands.length > 0;
+
+}
+
+// ======================================
+// MAIN DRAW LOOP
+// ======================================
+
+function draw() {
+
+    // ----------------------------------
+    // GET FINGER POSITION
+    // ----------------------------------
+
+    if (tracking && hands.length > 0) {
+
+        let indexTip = hands[0].keypoints[8];
+
+        let targetX = map(
+            indexTip.x,
+            0,
+            video.width,
+            0,
+            width
+        );
+
+        let targetY = map(
+            indexTip.y,
+            0,
+            video.height,
+            0,
+            height
+        );
+
+        // Smooth finger movement
+        smoothX = lerp(smoothX, targetX, 0.35);
+        smoothY = lerp(smoothY, targetY, 0.35);
+
+        document.getElementById("status").innerText =
+            "TRACKING ACTIVE";
+
+    } else {
+
+        document.getElementById("status").innerText =
+            "SHOW YOUR INDEX FINGER";
+
+    }
+
+    pointerX = smoothX;
+    pointerY = smoothY;
+
+    // ----------------------------------
+    // CALCULATE MOVEMENT SPEED
+    // ----------------------------------
+
+    let distance = dist(
+        pointerX,
+        pointerY,
+        previousX,
+        previousY
+    );
+
+    // Smooth speed readings
+    speed = lerp(speed, distance, 0.2);
+
+    previousX = pointerX;
+    previousY = pointerY;
+
+    // ----------------------------------
+    // DYNAMIC BACKGROUND COLOR
+    // ----------------------------------
+
+    let gradientAmount = constrain(
+        (pointerX / width + pointerY / height) / 2,
+        0,
+        1
+    );
+
+    let backgroundColor = lerpColor(
+        pink,
+        purple,
+        gradientAmount
+    );
+
+    background(backgroundColor);
+
+    // ----------------------------------
+    // SMOOTH PARTICLE EMISSION
+    // ----------------------------------
+
+    // Higher speed = more particles
+    let emission = map(
+        speed,
+        0,
+        35,
+        0,
+        15,
+        true
+    );
+
+    // Fractional emission creates smoother variation
+    let count = floor(emission);
+
+    if (random() < emission - count) {
+        count++;
+    }
+
+    // Interpolate along finger movement
+    for (let i = 0; i < count; i++) {
+
+        let spread = random(0.7, 1);
+
+        let particleX = lerp(
+            pointerX,
+            previousX,
+            random(0, 0.1)
+        );
+
+        let particleY = lerp(
+            pointerY,
+            previousY,
+            random(0, 0.1)
+        );
+
+        particles.push(
+            new Particle(particleX, particleY, speed)
+        );
+
+    }
+
+    // Limit particle count for performance
+    if (particles.length > 900) {
+        particles.splice(0, particles.length - 900);
+    }
+
+    // ----------------------------------
+    // DRAW PARTICLES
+    // ----------------------------------
+
+    blendMode(ADD);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+
+        let particle = particles[i];
+
+        particle.update();
+        particle.display();
+
+        if (particle.finished()) {
+            particles.splice(i, 1);
+        }
+
+    }
+
+    blendMode(BLEND);
+
+    // ----------------------------------
+    // DRAW GLOWING CURSOR
+    // ----------------------------------
+
+    noStroke();
+
+    // Outer glow
+    fill(255, 180, 230, 20);
+    circle(pointerX, pointerY, 100);
+
+    fill(255, 180, 230, 30);
+    circle(pointerX, pointerY, 65);
+
+    fill(255, 255, 255, 100);
+    circle(pointerX, pointerY, 30);
+
+    fill(255);
+    circle(pointerX, pointerY, 7);
+
+    // ----------------------------------
+    // UPDATE AUDIO
+    // ----------------------------------
+
+    updateAudio();
+
+}
+
+// ======================================
+// PARTICLE CLASS
+// ======================================
+
+class Particle {
+
+    constructor(x, y, movementSpeed) {
+
+        this.x = x;
+        this.y = y;
+
+        // Randomized movement
+        let angle = random(TWO_PI);
+
+        let force = random(0.2, 1.5) +
+                    movementSpeed * 0.04;
+
+        this.vx = cos(angle) * force;
+        this.vy = sin(angle) * force;
+
+        // Faster movement creates larger particles
+        this.size = random(4, 12) +
+                    min(movementSpeed * 0.12, 5);
+
+        this.alpha = random(130, 230);
+
+        this.decay = random(1.2, 2.8);
+
+        // Pink, lavender and white particle palette
+        this.color = random([
+            color(255, 190, 230),
+            color(225, 170, 255),
+            color(255, 255, 255),
+            color(190, 145, 255)
+        ]);
+
+    }
+
+    update() {
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Gradual slowdown
+        this.vx *= 0.97;
+        this.vy *= 0.97;
+
+        // Gradual transparency
+        this.alpha -= this.decay;
+
+        // Gentle particle shrinkage
+        this.size *= 0.993;
+
+    }
+
+    display() {
+
+        noStroke();
+
+        // Outer translucent glow
+        this.color.setAlpha(this.alpha * 0.12);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size * 4
+        );
+
+        // Middle glow
+        this.color.setAlpha(this.alpha * 0.3);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size * 2
+        );
+
+        // Bright particle center
+        this.color.setAlpha(this.alpha);
+
+        fill(this.color);
+
+        circle(
+            this.x,
+            this.y,
+            this.size
+        );
+
+    }
+
+    finished() {
+
+        return this.alpha <= 0;
+
+    }
+
+}
+
+// ======================================
+// FOUR-CORNER AUDIO SYSTEM
+// ======================================
+
+function updateAudio() {
+
+    if (!audioReady) return;
+
+    // Normalize pointer coordinates
+    let x = pointerX / width;
+    let y = pointerY / height;
+
+    // Smooth transitions based on frame time
+    let smoothing = 1 - Math.exp(-deltaTime / 350);
+
+    for (let i = 0; i < sounds.length; i++) {
+
+        let cornerX = corners[i][0];
+        let cornerY = corners[i][1];
+
+        // Calculate distance from corner
+        let distance = dist(
+            x,
+            y,
+            cornerX,
+            cornerY
+        );
+
+        // Normalize distance
+        let normalizedDistance = constrain(
+            distance / Math.sqrt(0.5),
+            0,
+            1
+        );
+
+        // Target volume:
+        // 100% at corner
+        // 50% at center
+        let targetVolume = map(
+            normalizedDistance,
+            0,
+            1,
+            1,
+            0.5
+        );
+
+        // Smoothly approach target volume
+        currentVolumes[i] = lerp(
+            currentVolumes[i],
+            targetVolume,
+            smoothing
+        );
+
+        sounds[i].volume = constrain(
+            currentVolumes[i],
+            0,
+            1
+        );
+
+    }
+
+}
+
+// ======================================
+// RESPONSIVE CANVAS
+// ======================================
+
+function windowResized() {
+
+    resizeCanvas(windowWidth, windowHeight);
+
+}
+
+</script>
+
+</body>
+</html>
